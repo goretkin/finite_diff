@@ -1,4 +1,5 @@
 
+import Random: MersenneTwister
 """
     adapted_grid(f, minmax::Tuple{Number, Number}; max_recursions = 7)
 
@@ -12,7 +13,7 @@ exactly at the end points of the intervals.
 The parameter `max_recusions` computes how many times each interval is allowed to
 be refined.
 """
-function adapted_grid(f, minmax::Tuple{Real, Real}; max_recursions = 7)
+function gg_adapted_grid(f, minmax::Tuple{Real, Real}; max_recursions = 70)
     if minmax[1] >= minmax[2]
         throw(ArgumentError("interval must be given as (min, max)"))
     end
@@ -26,21 +27,18 @@ function adapted_grid(f, minmax::Tuple{Real, Real}; max_recursions = 7)
     @assert isodd(n_points)
 
     xs = collect(range(minmax[1]; stop=minmax[2], length=n_points))
-    # Move the first and last interior points a bit closer to the end points
-    xs[2] = xs[1] + (xs[2] - xs[1]) * 0.25
-    xs[end-1] = xs[end] - (xs[end] - xs[end-1]) * 0.25
 
     # Wiggle interior points a bit to prevent aliasing and other degenerate cases
     rng = MersenneTwister(1337)
     rand_factor = 0.05
+    #=
     for i in 2:length(xs)-1
         xs[i] += rand_factor * 2 * (rand(rng) - 0.5) * (xs[i+1] - xs[i-1])
     end
-
+    =#
     n_tot_refinements = zeros(Int, n_intervals)
 
-    # We only evaluate the function on interior points
-    fs = [NaN; [f(x) for x in xs[2:end-1]]; NaN]
+    fs = [f(x) for x in xs]
     while true
         curvatures = zeros(n_intervals)
         active = falses(n_intervals)
@@ -52,7 +50,7 @@ function adapted_grid(f, minmax::Tuple{Real, Real}; max_recursions = 7)
             f_range = one(f_range)
         end
         # Skip first and last interval
-        for interval in 2:n_intervals-1
+        for interval in 1:n_intervals
             p = 2 * interval
             if n_tot_refinements[interval] >= max_recursions
                 # Skip intervals that have been refined too much
@@ -78,12 +76,6 @@ function adapted_grid(f, minmax::Tuple{Real, Real}; max_recursions = 7)
                 active[interval] = curvatures[interval] > max_curvature
             end
         end
-        # Approximate end intervals as being the same curvature as those next to it.
-        # This avoids computing the function in the end points
-        curvatures[1] = curvatures[2]
-        active[1] = active[2]
-        curvatures[end] = curvatures[end-1]
-        active[end] = active[end-1]
 
         if all(x -> x >= max_recursions, n_tot_refinements[active])
             break
@@ -139,5 +131,5 @@ function adapted_grid(f, minmax::Tuple{Real, Real}; max_recursions = 7)
         n_intervals = n_points ÷ 2
     end
 
-    return xs[2:end-1]
+    return xs
 end
