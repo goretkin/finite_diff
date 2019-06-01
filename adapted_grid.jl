@@ -7,19 +7,18 @@ Computes a grid `x` on the interval [minmax[1], minmax[2]] so that
 `plot(f, x)` gives a smooth "nice" plot.
 The method used is to create an initial uniform grid (21 points) and refine intervals
 where the second derivative is approximated to be large. When an interval
-becomes "straight enough" it is no longer divided. Functions are never evaluated
-exactly at the end points of the intervals.
+becomes "straight enough" it is no longer divided.
 
 The parameter `max_recusions` computes how many times each interval is allowed to
 be refined.
+
+The parameter `wiggle`: Wiggle interior points a bit to prevent aliasing and other degenerate cases
+The parameter `max_curvature`: When an interval has curvature smaller than this, stop refining it.
 """
-function gg_adapted_grid(f, minmax::Tuple{Real, Real}; max_recursions = 70)
+function gg_adapted_grid(f, minmax::Tuple{Real, Real}; max_recursions = 7, wiggle = true, max_curvature = 0.05)
     if minmax[1] >= minmax[2]
         throw(ArgumentError("interval must be given as (min, max)"))
     end
-
-    # When an interval has curvature smaller than this, stop refining it.
-    max_curvature = 0.05
 
     # Initial number of points
     n_points = 21
@@ -28,14 +27,13 @@ function gg_adapted_grid(f, minmax::Tuple{Real, Real}; max_recursions = 70)
 
     xs = collect(range(minmax[1]; stop=minmax[2], length=n_points))
 
-    # Wiggle interior points a bit to prevent aliasing and other degenerate cases
-    rng = MersenneTwister(1337)
-    rand_factor = 0.05
-    #=
-    for i in 2:length(xs)-1
-        xs[i] += rand_factor * 2 * (rand(rng) - 0.5) * (xs[i+1] - xs[i-1])
+    if wiggle
+        rng = MersenneTwister(1337)
+        rand_factor = 0.05
+        for i in 2:length(xs)-1
+            xs[i] += rand_factor * 2 * (rand(rng) - 0.5) * (xs[i+1] - xs[i-1])
+        end
     end
-    =#
     n_tot_refinements = zeros(Int, n_intervals)
 
     fs = [f(x) for x in xs]
